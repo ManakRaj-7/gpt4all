@@ -8,14 +8,9 @@
 #include <QVariant>
 #include <QTemporaryFile>
 #include <QThread>
+#include <QMutex>
 
 struct ReleaseInfo {
-    Q_GADGET
-    Q_PROPERTY(QString version MEMBER version)
-    Q_PROPERTY(QString notes MEMBER notes)
-    Q_PROPERTY(QString contributors MEMBER contributors)
-
-public:
     QString version;
     QString notes;
     QString contributors;
@@ -25,15 +20,15 @@ class HashAndSaveFile : public QObject
 {
     Q_OBJECT
 public:
-    HashAndSaveFile();
+    explicit HashAndSaveFile(QObject* parent = nullptr);
 
 public Q_SLOTS:
     void hashAndSave(const QString &hash, QCryptographicHash::Algorithm a, const QString &saveFilePath,
-        QFile *tempFile, QNetworkReply *modelReply);
+                     QFile *tempFile, QNetworkReply *modelReply);
 
 Q_SIGNALS:
     void hashAndSaveFinished(bool success, const QString &error,
-        QFile *tempFile, QNetworkReply *modelReply);
+                             QFile *tempFile, QNetworkReply *modelReply);
 
 private:
     QThread m_hashAndSaveThread;
@@ -66,14 +61,14 @@ private Q_SLOTS:
     void handleDownloadProgress(qint64 bytesReceived, qint64 bytesTotal);
     void handleModelDownloadFinished();
     void handleHashAndSaveFinished(bool success, const QString &error,
-        QFile *tempFile, QNetworkReply *modelReply);
+                                    QFile *tempFile, QNetworkReply *modelReply);
     void handleReadyRead();
 
 Q_SIGNALS:
     void releaseInfoChanged();
     void hasNewerReleaseChanged();
     void requestHashAndSave(const QString &hash, QCryptographicHash::Algorithm a, const QString &saveFilePath,
-        QFile *tempFile, QNetworkReply *modelReply);
+                            QFile *tempFile, QNetworkReply *modelReply);
 
 private:
     void parseReleaseJsonFile(const QByteArray &jsonData);
@@ -82,17 +77,17 @@ private:
     bool shouldRetry(const QString &filename);
     void clearRetry(const QString &filename);
 
+    explicit Download(QObject* parent = nullptr);
+    ~Download() {}
+    friend class MyDownload;
+
+    QMutex m_mutex; // Mutex for thread safety
     HashAndSaveFile *m_hashAndSave;
     QMap<QString, ReleaseInfo> m_releaseMap;
     QNetworkAccessManager m_networkManager;
     QMap<QNetworkReply*, QFile*> m_activeDownloads;
     QHash<QString, int> m_activeRetries;
     QDateTime m_startTime;
-
-private:
-    explicit Download();
-    ~Download() {}
-    friend class MyDownload;
 };
 
 #endif // DOWNLOAD_H
